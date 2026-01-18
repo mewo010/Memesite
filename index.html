@@ -3,99 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Meme Generator Pro</title>
+    <title>Meme Generator - Sound Fixed</title>
     <style>
         body {
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             margin: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            text-align: center;
-            color: #fff;
+            background: #1a1a2e;
+            color: white;
         }
         .container {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 30px;
+            background: #16213e;
+            padding: 2rem;
             border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-            max-width: 800px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            text-align: center;
+            border: 2px solid #0f3460;
         }
-        h1 { margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
         canvas {
             max-width: 100%;
             height: auto;
             border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
             background: #000;
+            margin: 20px 0;
         }
-        .controls { margin-top: 20px; }
         button {
-            padding: 15px 30px;
-            font-size: 20px;
-            font-weight: bold;
-            border: none;
-            background: #ff5733;
+            background: #e94560;
             color: white;
-            cursor: pointer;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            border: none;
             border-radius: 50px;
-            transition: transform 0.2s, background 0.3s;
-            box-shadow: 0 4px 15px rgba(255, 87, 51, 0.4);
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
         }
-        button:hover {
-            background: #e64a19;
-            transform: scale(1.05);
-        }
-        button:active { transform: scale(0.95); }
+        button:hover { background: #ff4d6d; transform: scale(1.05); }
+        #status { font-size: 0.8rem; color: #533483; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>🔥 Legendary Meme Machine 🔥</h1>
+        <h1>🔊 Meme Sound Machine 🔊</h1>
         <canvas id="memeCanvas"></canvas>
-        <div class="controls">
-            <button id="genBtn" onclick="displayNextMeme()">GIVE ME A MEME!</button>
-        </div>
+        <br>
+        <button id="memeBtn">GENERATE MEME & SOUND</button>
+        <div id="status">Click button to initialize audio...</div>
     </div>
 
     <script>
-        // 1. Configuration & Assets
-        let memes = [];
-        let memeIndex = 0;
-        let soundIndex = 0;
-        
-        // Expanded sound list
-        let soundURLs = [
+        const soundURLs = [
             "https://www.myinstants.com/media/sounds/vine-boom.mp3",
             "https://www.myinstants.com/media/sounds/bruh.mp3",
             "https://www.myinstants.com/media/sounds/roblox-death-sound_1.mp3",
-            "https://www.myinstants.com/media/sounds/oh-no-no-no-laugh.mp3",
             "https://www.myinstants.com/media/sounds/mlg-airhorn.mp3",
-            "https://www.myinstants.com/media/sounds/wasted.mp3",
             "https://www.myinstants.com/media/sounds/wow.mp3",
-            "https://www.myinstants.com/media/sounds/windows-xp-error.mp3",
-            "https://www.myinstants.com/media/sounds/mario-oof.mp3",
-            "https://www.myinstants.com/media/sounds/among-us.mp3",
             "https://www.myinstants.com/media/sounds/fbi-open-up.mp3",
-            "https://www.myinstants.com/media/sounds/emotional-damage.mp3",
-            "https://www.myinstants.com/media/sounds/discord-notification.mp3",
-            "https://www.myinstants.com/media/sounds/tuturu_1.mp3"
+            "https://www.myinstants.com/media/sounds/emotional-damage.mp3"
         ];
 
-        let activeSound = null;
-        let nextMemeImage = new Image(); // Buffer for the next image
+        let memes = [];
+        let memeIndex = 0;
+        let soundIndex = 0;
+        let audioElements = [];
+        let nextMemeImage = new Image();
         let currentMemeData = null;
-        
+
         const canvas = document.getElementById("memeCanvas");
         const ctx = canvas.getContext("2d");
+        const btn = document.getElementById("memeBtn");
+        const status = document.getElementById("status");
 
-        // 2. Utility: Shuffle Array (Fisher-Yates)
+        // 1. Shuffle helper
         function shuffle(array) {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -104,73 +88,91 @@
             return array;
         }
 
-        // 3. Core Logic
+        // 2. Preload Audio
+        function preloadSounds() {
+            shuffle(soundURLs);
+            audioElements = soundURLs.map(url => {
+                const audio = new Audio(url);
+                audio.load(); // Forces browser to start downloading
+                return audio;
+            });
+        }
+
+        // 3. Main Init
         async function init() {
+            preloadSounds();
             try {
                 let response = await fetch('https://api.imgflip.com/get_memes');
                 let data = await response.json();
-                memes = shuffle(data.data.memes); // Randomize the pool immediately
-                shuffle(soundURLs); // Randomize sounds immediately
-                
-                prepareNextMeme(); // Load the first one
+                memes = shuffle(data.data.memes);
+                prepareNextMeme();
+                status.innerText = "Ready! Click for memes.";
             } catch (err) {
-                console.error("Failed to load memes", err);
+                status.innerText = "Error loading memes.";
             }
         }
 
         function prepareNextMeme() {
-            // Cycle through memes
             currentMemeData = memes[memeIndex];
             nextMemeImage = new Image();
             nextMemeImage.crossOrigin = "Anonymous";
             nextMemeImage.src = currentMemeData.url;
-            
             memeIndex = (memeIndex + 1) % memes.length;
-            if (memeIndex === 0) shuffle(memes); // Re-shuffle when list ends
         }
 
-        function playRandomSound() {
-            if (activeSound) activeSound.pause();
+        // 4. Play Logic
+        function playSound() {
+            // Stop any playing sound
+            audioElements.forEach(s => {
+                s.pause();
+                s.currentTime = 0;
+            });
+
+            const currentSound = audioElements[soundIndex];
             
-            activeSound = new Audio(soundURLs[soundIndex]);
-            activeSound.play().catch(e => console.log("User interaction required for audio"));
-            
-            soundIndex = (soundIndex + 1) % soundURLs.length;
-            if (soundIndex === 0) shuffle(soundURLs); // Re-shuffle when list ends
+            // Promise based play to handle browser restrictions
+            let playPromise = currentSound.play();
+
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.log("Playback failed:", error);
+                    status.innerText = "Audio blocked! Try clicking again.";
+                });
+            }
+
+            soundIndex = (soundIndex + 1) % audioElements.length;
+            if (soundIndex === 0) shuffle(audioElements);
         }
 
         function displayNextMeme() {
-            if (!nextMemeImage.complete) return; // Wait if not loaded
+            if (!nextMemeImage.complete) {
+                status.innerText = "Loading image...";
+                return;
+            }
 
-            // Set canvas size based on image
+            status.innerText = "Playing!";
             canvas.width = nextMemeImage.width;
             canvas.height = nextMemeImage.height;
-            
-            // Draw Image
             ctx.drawImage(nextMemeImage, 0, 0);
             
             // Draw Text
-            drawMemeText(currentMemeData.name.toUpperCase());
-            
-            playRandomSound();
-            prepareNextMeme(); // Start loading the NEXT one immediately
-        }
-
-        function drawMemeText(text) {
             const fontSize = canvas.width / 12;
             ctx.font = `bold ${fontSize}px Impact`;
             ctx.fillStyle = "white";
             ctx.strokeStyle = "black";
             ctx.lineWidth = fontSize / 8;
             ctx.textAlign = "center";
-            
-            // Draw at the bottom
-            ctx.strokeText(text, canvas.width / 2, canvas.height - 20);
-            ctx.fillText(text, canvas.width / 2, canvas.height - 20);
+            ctx.strokeText(currentMemeData.name.toUpperCase(), canvas.width / 2, canvas.height - 20);
+            ctx.fillText(currentMemeData.name.toUpperCase(), canvas.width / 2, canvas.height - 20);
+
+            playSound();
+            prepareNextMeme();
         }
+
+        // Use Event Listener instead of inline onclick for better browser support
+        btn.addEventListener('click', displayNextMeme);
 
         init();
     </script>
 </body>
 </html>
-
