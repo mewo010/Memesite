@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Meme Generator</title>
+    <title>Ultimate Meme Generator Pro</title>
     <style>
         body {
             font-family: 'Poppins', sans-serif;
@@ -11,52 +11,66 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
-            background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             text-align: center;
-            color: #222;
+            color: #fff;
         }
         .container {
-            background: white;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
             padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-            max-width: 600px;
-            text-align: center;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        h1 { color: #ff5733; }
+        h1 { margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
         canvas {
             max-width: 100%;
+            height: auto;
             border-radius: 10px;
-            margin-top: 15px;
-            background: black;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            background: #000;
         }
+        .controls { margin-top: 20px; }
         button {
-            margin-top: 15px;
-            padding: 12px 20px;
-            font-size: 18px;
+            padding: 15px 30px;
+            font-size: 20px;
+            font-weight: bold;
             border: none;
             background: #ff5733;
             color: white;
             cursor: pointer;
-            border-radius: 8px;
-            transition: background 0.3s;
+            border-radius: 50px;
+            transition: transform 0.2s, background 0.3s;
+            box-shadow: 0 4px 15px rgba(255, 87, 51, 0.4);
         }
-        button:hover { background: #c70039; }
+        button:hover {
+            background: #e64a19;
+            transform: scale(1.05);
+        }
+        button:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <h1>😂 Ultimate Meme Generator 😂</h1>
+        <h1>🔥 Legendary Meme Machine 🔥</h1>
         <canvas id="memeCanvas"></canvas>
-        <br>
-        <button onclick="changeMeme()">Generate New Meme</button>
+        <div class="controls">
+            <button id="genBtn" onclick="displayNextMeme()">GIVE ME A MEME!</button>
+        </div>
     </div>
 
     <script>
+        // 1. Configuration & Assets
         let memes = [];
-        let usedMemes = new Set();
+        let memeIndex = 0;
+        let soundIndex = 0;
+        
+        // Expanded sound list
         let soundURLs = [
             "https://www.myinstants.com/media/sounds/vine-boom.mp3",
             "https://www.myinstants.com/media/sounds/bruh.mp3",
@@ -64,113 +78,99 @@
             "https://www.myinstants.com/media/sounds/oh-no-no-no-laugh.mp3",
             "https://www.myinstants.com/media/sounds/mlg-airhorn.mp3",
             "https://www.myinstants.com/media/sounds/wasted.mp3",
-            "https://www.myinstants.com/media/sounds/omg.mp3",
             "https://www.myinstants.com/media/sounds/wow.mp3",
             "https://www.myinstants.com/media/sounds/windows-xp-error.mp3",
-            "https://www.myinstants.com/media/sounds/sad-violin.mp3",
             "https://www.myinstants.com/media/sounds/mario-oof.mp3",
             "https://www.myinstants.com/media/sounds/among-us.mp3",
-            "https://www.myinstants.com/media/sounds/epic-win.mp3",
             "https://www.myinstants.com/media/sounds/fbi-open-up.mp3",
-            "https://www.myinstants.com/media/sounds/mission-failed.mp3"
+            "https://www.myinstants.com/media/sounds/emotional-damage.mp3",
+            "https://www.myinstants.com/media/sounds/discord-notification.mp3",
+            "https://www.myinstants.com/media/sounds/tuturu_1.mp3"
         ];
 
         let activeSound = null;
-        let canvas = document.getElementById("memeCanvas");
-        let ctx = canvas.getContext("2d");
+        let nextMemeImage = new Image(); // Buffer for the next image
+        let currentMemeData = null;
+        
+        const canvas = document.getElementById("memeCanvas");
+        const ctx = canvas.getContext("2d");
 
-        async function fetchMemes() {
+        // 2. Utility: Shuffle Array (Fisher-Yates)
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 3. Core Logic
+        async function init() {
             try {
                 let response = await fetch('https://api.imgflip.com/get_memes');
                 let data = await response.json();
-                memes = data.data.memes.slice(0, 1000);
-                usedMemes.clear();
-                changeMeme();
-            } catch (error) {
-                console.error("Error fetching memes:", error);
+                memes = shuffle(data.data.memes); // Randomize the pool immediately
+                shuffle(soundURLs); // Randomize sounds immediately
+                
+                prepareNextMeme(); // Load the first one
+            } catch (err) {
+                console.error("Failed to load memes", err);
             }
         }
 
-        function stopSound() {
-            if (activeSound) {
-                activeSound.pause();
-                activeSound.currentTime = 0;
-            }
+        function prepareNextMeme() {
+            // Cycle through memes
+            currentMemeData = memes[memeIndex];
+            nextMemeImage = new Image();
+            nextMemeImage.crossOrigin = "Anonymous";
+            nextMemeImage.src = currentMemeData.url;
+            
+            memeIndex = (memeIndex + 1) % memes.length;
+            if (memeIndex === 0) shuffle(memes); // Re-shuffle when list ends
         }
 
-        function playSound() {
-            stopSound();
-            let soundURL = soundURLs[Math.floor(Math.random() * soundURLs.length)];
-            activeSound = new Audio(soundURL);
-
-            activeSound.addEventListener("error", () => {
-                console.error("Failed to load sound:", soundURL);
-                playSound();
-            });
-
-            activeSound.play();
+        function playRandomSound() {
+            if (activeSound) activeSound.pause();
+            
+            activeSound = new Audio(soundURLs[soundIndex]);
+            activeSound.play().catch(e => console.log("User interaction required for audio"));
+            
+            soundIndex = (soundIndex + 1) % soundURLs.length;
+            if (soundIndex === 0) shuffle(soundURLs); // Re-shuffle when list ends
         }
 
-        function changeMeme() {
-            if (usedMemes.size === memes.length) usedMemes.clear();
+        function displayNextMeme() {
+            if (!nextMemeImage.complete) return; // Wait if not loaded
 
-            let newMeme;
-            do {
-                newMeme = memes[Math.floor(Math.random() * memes.length)];
-            } while (usedMemes.has(newMeme.id));
-
-            usedMemes.add(newMeme.id);
-
-            let img = new Image();
-            img.crossOrigin = "Anonymous"; 
-            img.src = newMeme.url;
-
-            img.onload = function () {
-                canvas.width = img.width / 2;
-                canvas.height = img.height / 2;
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                drawText(ctx, newMeme.name.toUpperCase(), canvas.width, canvas.height);
-                playSound();
-            };
+            // Set canvas size based on image
+            canvas.width = nextMemeImage.width;
+            canvas.height = nextMemeImage.height;
+            
+            // Draw Image
+            ctx.drawImage(nextMemeImage, 0, 0);
+            
+            // Draw Text
+            drawMemeText(currentMemeData.name.toUpperCase());
+            
+            playRandomSound();
+            prepareNextMeme(); // Start loading the NEXT one immediately
         }
 
-        function drawText(ctx, text, width, height) {
-            let maxWidth = width * 0.9;
-            let fontSize = Math.min(30, width / 10);
-
-            ctx.font = `bold ${fontSize}px Arial`;
+        function drawMemeText(text) {
+            const fontSize = canvas.width / 12;
+            ctx.font = `bold ${fontSize}px Impact`;
             ctx.fillStyle = "white";
-            ctx.textAlign = "center";
-            ctx.lineWidth = 3;
             ctx.strokeStyle = "black";
-
-            let lines = [];
-            let words = text.split(" ");
-            let currentLine = "";
-
-            for (let word of words) {
-                let testLine = currentLine + (currentLine ? " " : "") + word;
-                let testWidth = ctx.measureText(testLine).width;
-
-                if (testWidth > maxWidth) {
-                    lines.push(currentLine);
-                    currentLine = word;
-                } else {
-                    currentLine = testLine;
-                }
-            }
-            lines.push(currentLine);
-
-            let y = height - (lines.length * fontSize) - 10;
-
-            for (let line of lines) {
-                ctx.strokeText(line, width / 2, y);
-                ctx.fillText(line, width / 2, y);
-                y += fontSize;
-            }
+            ctx.lineWidth = fontSize / 8;
+            ctx.textAlign = "center";
+            
+            // Draw at the bottom
+            ctx.strokeText(text, canvas.width / 2, canvas.height - 20);
+            ctx.fillText(text, canvas.width / 2, canvas.height - 20);
         }
 
-        fetchMemes();
+        init();
     </script>
 </body>
 </html>
+
